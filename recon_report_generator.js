@@ -11,6 +11,17 @@ const knownVulnerable = [
     { service: 'Apache Tomcat', cve: 'CVE-2019-0232' }
 ]
 
+async function cveinfor(cveId){
+if (!cveId) return null
+try{
+    const response =await fetch(`https://cveawg.mitre.org/api/cve/${cveId}`)
+    const data=await response.json()
+    return data.containers.cna.descriptions[0].value
+}catch(e){
+    return 'description unavailable'
+}
+}
+
 
 class Target{
     constructor(ip,os){
@@ -29,12 +40,21 @@ autocheck(){
             p.cve=match.cve
         }})
 }
-report(){
-    let report= `\n=== TARGET: ${this.ip} (${this.os}) ===\n`
-    this.ports.forEach(p=>{let status=p.vulnerable ? 'vulnerable' : 'ok'
-    let cve =p.cve ? ` [${p.cve}]` : ''
-        report +=` port ${p.number} - ${p.service} [${status}]${cve}\n`
-    })
+async report(){
+    let report = `\n=== TARGET: ${this.ip} (${this.os}) ===\n`
+    for(let p of this.ports){
+        let status = p.vulnerable ? 'vulnerable' : 'ok'
+        let description = p.cve ? await cveinfor(p.cve) : 'N/A'
+        let cve=p.cve? p.cve: 'N/A'
+
+        report += 
+        ` port ${p.number} - ${p.service} 
+        status:[${status}] 
+        CVE:${cve}
+        Description:${description}
+        
+        -----------------------------------------------\n`
+    }
     return report
 }
 }
@@ -49,4 +69,4 @@ metasploitable.addPort(6667, 'UnrealIRCd')
 metasploitable.addPort(5432, 'PostgreSQL 8.3')
 metasploitable.addPort(8180, 'Apache Tomcat')
 metasploitable.autocheck()
-console.log(metasploitable.report())
+metasploitable.report().then(r => console.log(r))
